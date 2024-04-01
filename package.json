@@ -1,0 +1,15 @@
+{
+  "name": "seaedh-weighted-scores",
+  "version": "1.0.0",
+  "description": "tiebreaker utility for the seaedh league",
+  "main": "tb.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "csv-parse": "^5.5.5",
+    "fs": "^0.0.1-security"
+  }
+}

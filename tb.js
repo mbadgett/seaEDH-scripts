@@ -1,108 +1,106 @@
-//Note find replace pasted excel data with find:"([\w])(\s+)([0-9]{1,2})" replace:"$1,$3"
+const { parse } = require("csv-parse");
+const fs = require("fs");
 
-let snackPods = [
-  `chaotrix,2
-kaliri_,6
-kingdurkle,2
-Snackzones#0923,6`,
-  `Btots#8381,0
-Ulthyr,5
-Isaiah,0
-Snackzones#0923,15`,
-  `Snackzones#0923,10
-subzero719,5
-abaddon#2296,0
-kaliri_,5`,
-  `Snackzones#0923,0
-Marcus,0
-kingdurkle,15
-redxross,5`,
-  `chief_vibe,0
-Btots#8381,0
-Snackzones#0923,10
-chaotrix,10`,
-  `Mathew V,7
-Isaiah,2
-Ponzusaus#0001,2
-Snackzones#0923,7`,
-];
+let winValue = 5;
+let drawValue = 1;
 
-let cloudPods = [
-`Darkcloud06#2459,5
-Isaiah,5
-redxross,5
-subzero719,5`,
-`abaddon#2296,0
-chaotrix,10
-Darkcloud06#2459,10
-Mathew V,0`,
-`Ulthyr,2
-Ponzusaus#0001,7
-kingdurkle,2
-Darkcloud06#2459,7`,
-`Mathew V,15
-Btots#8381,1
-abaddon#2296,1
-Darkcloud06#2459,1`,
-`KujoFD,0
-Isaiah,5
-Darkcloud06#2459,15
-Marcus,0`,
-`redxross,0
-Darkcloud06#2459,10
-chaotrix,5
-kingdurkle,5`
-]
-
-let finalScores = {
-  "Darkcloud06#2459": 48,
-  "Snackzones#0923": 48,
-  chief_vibe: 44,
-  subzero719: 38,
-  chaotrix: 37,
-  kingdurkle: 34,
-  "abaddon#2296": 30,
-  Isaiah: 29,
-  "Mathew V": 26,
-  kaliri_: 25,
-  redxross: 23,
-  "Ponzusaus#0001": 20,
-  Ulthyr: 18,
-  KujoFD: 15,
-  "Btots#8381": 12,
-  Marcus: 9,
-};
-
-let winValue = 5
-let drawValue = 1
-let playersToPods = {
-	"Darkcloud06#2459": cloudPods,
-	"Snackzones#0923": snackPods
+function parsePods(parseScoresCallback) {
+  let pods = { 1: [], 2: [], 3: [], 4: [], 5: [], 6: [] };
+  let weekTracker = 1;
+  fs.createReadStream("./csv/pods.csv")
+    .pipe(parse({ delimiter: ",", columns: true, ltrim: true, from_line: 1 }))
+    .on("data", function (week) {
+      for (const pod in week) {
+        if (Object.hasOwnProperty.call(week, pod)) {
+          const matchup = week[pod];
+          pods[weekTracker].push(
+            matchup.replace("Guy, like the word", "Guy like the word")
+          );
+        }
+      }
+      weekTracker++;
+    })
+    .on("error", function (error) {
+      console.log(error.message);
+    })
+    .on("end", function () {
+      parseScoresCallback(pods);
+    });
 }
-console.log("Final weighted score for players:")
-for (const player in playersToPods) {
-	let playerWeightedWinScore = 0;
-	let playersPods = playersToPods[player]
 
-	console.log(`Player: ${player}`)
-	for (let i = 0; i < playersPods.length; i++) {
-		const game = playersPods[i]
-		let podWeight = 0;
-		let playerScore = 0;
-		for (const score of game.split("\n")) {
-		  res = score.split(",");
-	  
-		  if (res[0] == player) {
-			  playerScore = res[1]
-		  } else {
-			// Use the name of the player to look up their final score and create a weight for the pod
-			podWeight += finalScores[res[0]];
-		  }
+function parseScores(calculateResultsCallback) {
+  return function (pods) {
+    let players = {};
+    fs.createReadStream("./csv/scores.csv")
+      .pipe(parse({ delimiter: ",", columns: true, ltrim: true, from_line: 1 }))
+      .on("data", function (row) {
+        let player = row["Players:"].replace("Guy, like the word", "Guy like the word");
+        let playerObj = {
+          1: row["Week 1:"],
+          2: row["Week 2:"],
+          3: row["Week 3:"],
+          4: row["Week 4:"],
+          5: row["Week 5:"],
+          6: row["Week 6:"],
+          total: row["Total Points:"],
+        };
+
+        players[player] = playerObj;
+      })
+      .on("error", function (error) {
+        console.log(error.message);
+      })
+      .on("end", function () {
+        calculateResultsCallback(players, pods);
+      });
+  };
+}
+
+function calculate(players, pods) {
+  console.log("Final weighted score for players:");
+  const weightedPlayerScores = {}
+  for (const week in pods) {
+    const games = pods[week];
+
+    for (game of games) {
+	  const playerWinsForWeek = {}
+      let podWeight = 0;
+      participants = game.split(", ")
+	  for (player of participants) {
+		playerWinsForWeek[player] = 0
+		let playerScore = parseInt(players[player][week]);
+		podWeight += parseInt(players[player]["total"])
+		let playerWins = Math.floor(playerScore / winValue);
+		let playerDraws = (playerScore % winValue) / drawValue;
+		if (weightedPlayerScores[player] == undefined) {
+			weightedPlayerScores[player] = 0
 		}
-		playerWins = Math.floor(playerScore / winValue)
-		playerDraws = (playerScore%5) / drawValue
-		playerWeightedWinScore += playerWins * podWeight
-		console.log(`Week ${i+1} => wins: ${playerWins}, weight: ${podWeight}, weighted score:${playerWins * podWeight}`)
-	}
-	console.log(`Final score:${playerWeightedWinScore}\n`)
+		playerWinsForWeek[player] = playerWins
+	  }
+	  for (player of participants) {
+		weightedPlayerScores[player] += playerWinsForWeek[player] * podWeight
+		// console.log(
+		// 	`Week ${
+		// 	  week
+		// 	} Player: ${player} => wins: ${playerWinsForWeek[player]}, weight: ${podWeight}, cumulative weighted score:${
+		// 		weightedPlayerScores[player]
+		// 	}`
+		//   );
+	  }
+    }
+  }
+
+  var sortedScores = Object.keys(weightedPlayerScores).map(function(player) {
+	return [player, weightedPlayerScores[player]];
+  }).sort(function(first, second) {
+	return second[1] - first[1];
+  });
+  
+  for (score of sortedScores) {
+	console.log(
+		`Final score for player: ${score[0]} => ${score[1]}`
+	  );
+  }
 }
+
+parsePods(parseScores(calculate));
